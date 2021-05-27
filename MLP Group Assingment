@@ -1,0 +1,245 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import cv2
+import os
+import random
+from keras.preprocessing.image import load_img
+
+filenames = "./drive/MyDrive/flowers"
+
+FLOWER_DAISY_DIR= filenames + '/daisy'
+FLOWER_TULIP_DIR= filenames + '/tulip'
+FLOWER_ROSE_DIR= filenames + '/rose'
+
+sample1 = "/" + random.choice(os.listdir(FLOWER_DAISY_DIR))
+sample2 = "/" + random.choice(os.listdir(FLOWER_TULIP_DIR))
+sample3 = "/" + random.choice(os.listdir(FLOWER_ROSE_DIR))
+
+image = load_img(FLOWER_DAISY_DIR + sample1)
+plt.imshow(image)
+
+image = load_img(FLOWER_TULIP_DIR + sample2)
+plt.imshow(image)
+
+image = load_img(FLOWER_ROSE_DIR + sample3)
+plt.imshow(image)
+
+def imgtoarray(file):
+  img = cv2.imread(file)
+  img = cv2.resize(img,dsize=(320,240))
+  img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+  img = np.array(img)
+  return img
+
+img = imgtoarray(FLOWER_DAISY_DIR+"/"+'14613443462_d4ed356201.jpg')
+plt.imshow(img,cmap='gray')
+plt.show()
+img.shape
+
+images_train=[]
+labels_train=[]
+for img in os.listdir(FLOWER_DAISY_DIR)[:80]:
+  arr = imgtoarray(FLOWER_DAISY_DIR + '/' + img)
+  images_train.append(arr)
+  labels_train.append([1,0,0])
+
+for img in os.listdir(FLOWER_TULIP_DIR)[:80]:
+  arr = imgtoarray(FLOWER_TULIP_DIR + '/' + img)
+  images_train.append(arr)
+  labels_train.append([0,1,0])
+
+for img in os.listdir(FLOWER_ROSE_DIR)[:80]:
+  arr = imgtoarray(FLOWER_ROSE_DIR + '/' + img)
+  images_train.append(arr)
+  labels_train.append([0,0,1])
+
+images_test=[]
+labels_test=[]
+
+for img in os.listdir(FLOWER_DAISY_DIR)[80:]:
+  arr = imgtoarray(FLOWER_DAISY_DIR + '/' + img)
+  images_test.append(arr)
+  labels_test.append([1,0,0])
+
+for img in os.listdir(FLOWER_TULIP_DIR)[80:]:
+  arr = imgtoarray(FLOWER_TULIP_DIR + '/' + img)
+  images_test.append(arr)
+  labels_test.append([0,1,0])
+
+for img in os.listdir(FLOWER_ROSE_DIR)[80:]:
+  arr = imgtoarray(FLOWER_ROSE_DIR + '/' + img)
+  images_test.append(arr)
+  labels_test.append([0,0,1])
+
+print("Done")
+
+images_train = np.array(images_train)
+labels_train = np.array(labels_train)
+images_test = np.array(images_test)
+labels_test = np.array(labels_test)
+images_train.shape,images_test.shape, labels_train.shape, labels_test.shape
+
+images_train=images_train.reshape(240,240*320)
+images_test=images_test.reshape(60,240*320)
+images_train.shape,images_test.shape
+
+import pandas as pd
+feature_train = pd.DataFrame(images_train)
+feature_test = pd.DataFrame(images_test)
+target_train = pd.DataFrame(labels_train, columns = ['Daisy','Tulip','Rose'])
+target_test = pd.DataFrame(labels_test, columns = ['Daisy','Tulip','Rose'])
+feature_train = feature_train / 255
+feature_test = feature_train / 255
+
+feature_train.sample(5)
+
+feature_test.sample(5)
+
+target_train.sample(5)
+
+target_test.sample(5)
+
+import random
+
+theta1 = [0.0001] * 76800
+theta2 = [0.0001] * 76800
+theta3 = [0.0001] * 76800
+
+random.seed(3031)
+bias1 = random.random()
+random.seed(7819)
+bias2 = random.random()
+random.seed(1011)
+bias3 = random.random()
+
+def result(rows):
+  result1 = sum(feature_train.iloc[rows] * theta1) + bias1 
+  result2 = sum(feature_train.iloc[rows] * theta2) + bias2
+  result3 = sum(feature_train.iloc[rows] * theta3) + bias3
+
+  return result1,result2,result3
+
+def activation(rows):
+  result1,result2,result3 = result(rows)
+  sig1 = 1/(1+np.exp(-result1))
+  sig2 = 1/(1+np.exp(-result2))
+  sig3 = 1/(1+np.exp(-result3))
+  return sig1, sig2, sig3
+
+def bigger(x):
+  if x > 0.5:
+    return 1
+  else:
+    return 0
+
+def prediction(rows):
+  sig1, sig2, sig3 = activation(rows)
+  pred1 = bigger(sig1)
+  pred2 = bigger(sig2)
+  pred3 = bigger(sig3)
+  return pred1 ,pred2 ,pred3 
+
+def result_hidden(rows):
+  sig1, sig2, sig3 = activation(rows)
+  result1 = sig1 * theta1[rows] + bias1 
+  result2 = sig2 * theta1[rows] + bias2
+  result3 = sig3 * theta1[rows] + bias3
+
+  return result1,result2,result3
+
+def activation_hidden(rows):
+  result1,result2,result3 = result_hidden(rows)
+  sig1 = 1/(1+np.exp(-result1))
+  sig2 = 1/(1+np.exp(-result2))
+  sig3 = 1/(1+np.exp(-result3))
+  return sig1, sig2, sig3
+
+def prediction_hidden(rows):
+  sig1, sig2, sig3 = activation_hidden(rows)
+  pred1 = bigger(sig1)
+  pred2 = bigger(sig2)
+  pred3 = bigger(sig3)
+  return pred1 ,pred2 ,pred3
+
+def error_hidden(rows):
+  sig1, sig2, sig3 = activation_hidden(rows)
+  error1 = (sig1 - labels_train[rows][0])**2
+  error2 = (sig2 - labels_train[rows][1])**2
+  error3 = (sig3 - labels_train[rows][2])**2
+
+  return error1,error2,error3
+
+def back_output_hidden(rows, learn_rate):
+	act1, act2, act3 = activation(rows)
+	sig1, sig2, sig3 = activation_hidden(rows)
+
+	dtheta1 = -2*(labels_train[rows][0] - sig1)*sig1*(1-sig1)*act1
+	dtheta2 = -2*(labels_train[rows][1] - sig2)*sig2*(1-sig2)*act2
+	dtheta3 = -2*(labels_train[rows][2] - sig3)*sig3*(1-sig3)*act3
+
+
+	dbias1 = -2*(labels_train[rows][0] - sig1)*sig1*(1-sig1)*1
+	dbias2 = -2*(labels_train[rows][1] - sig2)*sig2*(1-sig2)*1
+	dbias3 = -2*(labels_train[rows][2] - sig3)*sig3*(1-sig3)*1
+
+	ntheta1 = theta1 - (learn_rate*dtheta1)
+	ntheta2 = theta2 - (learn_rate*dtheta2)
+	ntheta3 = theta3 - (learn_rate*dtheta3)
+	
+	nbias1 = bias1 - (learn_rate*dbias1)
+	nbias2 = bias2 - (learn_rate*dbias2)
+	nbias3 = bias3 - (learn_rate*dbias3)
+
+	return ntheta1, ntheta2, ntheta3, nbias1, nbias2, nbias3
+
+
+def back_hidden_input(rows, learn_rate):
+	act1, act2, act3 = activation(rows)
+	sig1, sig2, sig3 = activation_hidden(rows)
+	
+
+	d11 = -2*(labels_train[rows][0] - sig1)*sig1*(1-sig1)*theta1
+	d12 = -2*(labels_train[rows][1] - sig2)*sig2*(1-sig2)*theta1
+	d13 = -2*(labels_train[rows][2] - sig3)*sig3*(1-sig3)*theta1
+
+
+	d21 = -2*(labels_train[rows][0] - sig1)*sig1*(1-sig1)*theta2
+	d22 = -2*(labels_train[rows][1] - sig2)*sig2*(1-sig2)*theta2
+	d23 = -2*(labels_train[rows][2] - sig3)*sig3*(1-sig3)*theta2
+
+
+	d31 = -2*(labels_train[rows][0] - sig1)*sig1*(1-sig1)*theta3
+	d32 = -2*(labels_train[rows][1] - sig2)*sig2*(1-sig2)*theta3
+	d33 = -2*(labels_train[rows][2] - sig3)*sig3*(1-sig3)*theta3
+
+	dtheta1 = (d11+d21+d31)*act1*(1-act1)*feature_train.iloc[rows]
+	dtheta2 = (d12+d22+d32)*act2*(1-act2)*feature_train.iloc[rows]
+	dtheta3 = (d13+d23+d33)*act3*(1-act3)*feature_train.iloc[rows]
+	
+	dbias1 = (d11+d21+d31)*act1*(1-act1)*1
+	dbias2 = (d12+d22+d32)*act2*(1-act2)*1
+	dbias3 = (d13+d23+d33)*act3*(1-act3)*1
+
+	ntheta1 = theta1 - (learn_rate*dtheta1)
+	ntheta2 = theta2 - (learn_rate*dtheta2)
+	ntheta3 = theta3 - (learn_rate*dtheta3)
+
+	nbias1 = bias1 - (learn_rate*dbias1)
+	nbias2 = bias2 - (learn_rate*dbias2)
+	nbias3 = bias3 - (learn_rate*dbias3)
+
+	return ntheta1, ntheta2, ntheta3, nbias1, nbias2, nbias3
+
+
+def trainnetwork(epoch, lr, train):
+  sumerror=0
+  acc=0
+  for ep in range(epoch):
+    for i in range(len(train))
+
+def accuracy(actual, predicted):
+  correct=0
+  for i in range(len(actual)):
+    if actual[i] == predicted[i]:
+      correct += 1
+  return float(correct)/float(len(actual))
